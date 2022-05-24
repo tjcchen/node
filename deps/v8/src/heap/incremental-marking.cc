@@ -225,6 +225,9 @@ namespace {
 
 void MarkRoots(Heap* heap) {
   IncrementalMarkingRootMarkingVisitor visitor(heap);
+  CodePageHeaderModificationScope rwx_write_scope(
+      "Marking of builtins table entries require write access to Code page "
+      "header");
   heap->IterateRoots(
       &visitor,
       base::EnumSet<SkipRoot>{SkipRoot::kStack, SkipRoot::kMainThreadHandles,
@@ -304,7 +307,11 @@ void IncrementalMarking::StartBlackAllocation() {
   black_allocation_ = true;
   heap()->old_space()->MarkLinearAllocationAreaBlack();
   if (heap()->map_space()) heap()->map_space()->MarkLinearAllocationAreaBlack();
-  heap()->code_space()->MarkLinearAllocationAreaBlack();
+  {
+    CodePageHeaderModificationScope rwx_write_scope(
+        "Marking Code objects requires write access to the Code page header");
+    heap()->code_space()->MarkLinearAllocationAreaBlack();
+  }
   heap()->safepoint()->IterateLocalHeaps([](LocalHeap* local_heap) {
     local_heap->MarkLinearAllocationAreaBlack();
   });
@@ -318,7 +325,11 @@ void IncrementalMarking::PauseBlackAllocation() {
   DCHECK(IsMarking());
   heap()->old_space()->UnmarkLinearAllocationArea();
   if (heap()->map_space()) heap()->map_space()->UnmarkLinearAllocationArea();
-  heap()->code_space()->UnmarkLinearAllocationArea();
+  {
+    CodePageHeaderModificationScope rwx_write_scope(
+        "Marking Code objects requires write access to the Code page header");
+    heap()->code_space()->UnmarkLinearAllocationArea();
+  }
   heap()->safepoint()->IterateLocalHeaps(
       [](LocalHeap* local_heap) { local_heap->UnmarkLinearAllocationArea(); });
   if (FLAG_trace_incremental_marking) {
@@ -826,7 +837,7 @@ void IncrementalMarking::FetchBytesMarkedConcurrently() {
   if (FLAG_concurrent_marking) {
     size_t current_bytes_marked_concurrently =
         heap()->concurrent_marking()->TotalMarkedBytes();
-    // The concurrent_marking()->TotalMarkedBytes() is not monothonic for a
+    // The concurrent_marking()->TotalMarkedBytes() is not monotonic for a
     // short period of time when a concurrent marking task is finishing.
     if (current_bytes_marked_concurrently > bytes_marked_concurrently_) {
       bytes_marked_ +=
@@ -854,7 +865,7 @@ size_t IncrementalMarking::ComputeStepSizeInBytes(StepOrigin step_origin) {
           (bytes_marked_ - scheduled_bytes_to_mark_) / KB);
     }
   }
-  // Allow steps on allocation to get behind the schedule by small ammount.
+  // Allow steps on allocation to get behind the schedule by small amount.
   // This gives higher priority to steps in tasks.
   size_t kScheduleMarginInBytes = step_origin == StepOrigin::kV8 ? 1 * MB : 0;
   if (bytes_marked_ + kScheduleMarginInBytes > scheduled_bytes_to_mark_)

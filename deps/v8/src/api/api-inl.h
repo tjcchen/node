@@ -20,7 +20,7 @@ namespace v8 {
 
 template <typename T>
 inline T ToCData(v8::internal::Object obj) {
-  STATIC_ASSERT(sizeof(T) == sizeof(v8::internal::Address));
+  static_assert(sizeof(T) == sizeof(v8::internal::Address));
   if (obj == v8::internal::Smi::zero()) return nullptr;
   return reinterpret_cast<T>(
       v8::internal::Foreign::cast(obj).foreign_address());
@@ -35,7 +35,7 @@ inline v8::internal::Address ToCData(v8::internal::Object obj) {
 template <typename T>
 inline v8::internal::Handle<v8::internal::Object> FromCData(
     v8::internal::Isolate* isolate, T obj) {
-  STATIC_ASSERT(sizeof(T) == sizeof(v8::internal::Address));
+  static_assert(sizeof(T) == sizeof(v8::internal::Address));
   if (obj == nullptr) return handle(v8::internal::Smi::zero(), isolate);
   return isolate->factory()->NewForeign(
       reinterpret_cast<v8::internal::Address>(obj));
@@ -96,7 +96,6 @@ TYPED_ARRAYS(MAKE_TO_LOCAL_TYPED_ARRAY)
 MAKE_TO_LOCAL(ToLocal, FunctionTemplateInfo, FunctionTemplate)
 MAKE_TO_LOCAL(ToLocal, ObjectTemplateInfo, ObjectTemplate)
 MAKE_TO_LOCAL(SignatureToLocal, FunctionTemplateInfo, Signature)
-MAKE_TO_LOCAL(AccessorSignatureToLocal, FunctionTemplateInfo, AccessorSignature)
 MAKE_TO_LOCAL(MessageToLocal, Object, Message)
 MAKE_TO_LOCAL(PromiseToLocal, JSObject, Promise)
 MAKE_TO_LOCAL(StackTraceToLocal, FixedArray, StackTrace)
@@ -232,14 +231,6 @@ class V8_NODISCARD InternalEscapableScope : public EscapableHandleScope {
   explicit inline InternalEscapableScope(i::Isolate* isolate)
       : EscapableHandleScope(reinterpret_cast<v8::Isolate*>(isolate)) {}
 };
-
-inline bool IsExecutionTerminatingCheck(i::Isolate* isolate) {
-  if (isolate->has_scheduled_exception()) {
-    return isolate->scheduled_exception() ==
-           i::ReadOnlyRoots(isolate).termination_exception();
-  }
-  return false;
-}
 
 template <typename T>
 void CopySmiElementsToTypedBuffer(T* dst, uint32_t length,

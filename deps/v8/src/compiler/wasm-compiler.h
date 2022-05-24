@@ -28,6 +28,7 @@ namespace v8 {
 namespace internal {
 struct AssemblerOptions;
 class TurbofanCompilationJob;
+enum class BranchHint : uint8_t;
 
 namespace compiler {
 // Forward declarations for some compiler data structures.
@@ -44,10 +45,10 @@ enum class TrapId : uint32_t;
 struct Int64LoweringSpecialCase;
 template <size_t VarCount>
 class GraphAssemblerLabel;
-enum class BranchHint : uint8_t;
 }  // namespace compiler
 
 namespace wasm {
+class AssemblerBufferCache;
 struct DecodeStruct;
 // Expose {Node} and {Graph} opaquely as {wasm::TFNode} and {wasm::TFGraph}.
 using TFNode = compiler::Node;
@@ -64,7 +65,7 @@ namespace compiler {
 wasm::WasmCompilationResult ExecuteTurbofanWasmCompilation(
     wasm::CompilationEnv*, const wasm::WireBytesStorage* wire_bytes_storage,
     const wasm::FunctionBody&, int func_index, Counters*,
-    wasm::WasmFeatures* detected);
+    wasm::AssemblerBufferCache* buffer_cache, wasm::WasmFeatures* detected);
 
 // Calls to Wasm imports are handled in several different ways, depending on the
 // type of the target function/callable and whether the signature matches the
@@ -370,7 +371,8 @@ class WasmGraphBuilder {
 
   void CompareToInternalFunctionAtIndex(Node* func_ref, uint32_t function_index,
                                         Node** success_control,
-                                        Node** failure_control);
+                                        Node** failure_control,
+                                        bool is_last_case);
 
   void BrOnNull(Node* ref_object, Node** non_null_node, Node** null_node);
 
@@ -559,6 +561,9 @@ class WasmGraphBuilder {
   static const wasm::FunctionSig* Int64LoweredSig(Zone* zone,
                                                   const wasm::FunctionSig* sig);
 
+  void StoreCallCount(Node* call, int count);
+  void ReserveCallCounts(size_t num_call_instructions);
+
  protected:
   V8_EXPORT_PRIVATE WasmGraphBuilder(wasm::CompilationEnv* env, Zone* zone,
                                      MachineGraph* mcgraph,
@@ -689,19 +694,6 @@ class WasmGraphBuilder {
   Node* BuildDiv64Call(Node* left, Node* right, ExternalReference ref,
                        MachineType result_type, wasm::TrapReason trap_zero,
                        wasm::WasmCodePosition position);
-
-  Node* BuildTruncateIntPtrToInt32(Node* value);
-  Node* BuildChangeInt32ToIntPtr(Node* value);
-  Node* BuildChangeIntPtrToInt64(Node* value);
-  Node* BuildChangeUint32ToUintPtr(Node*);
-  Node* BuildChangeInt32ToSmi(Node* value);
-  Node* BuildChangeUint31ToSmi(Node* value);
-  Node* BuildSmiShiftBitsConstant();
-  Node* BuildSmiShiftBitsConstant32();
-  Node* BuildChangeSmiToInt32(Node* value);
-  Node* BuildChangeSmiToIntPtr(Node* value);
-  // generates {index > max ? Smi(max) : Smi(index)}
-  Node* BuildConvertUint32ToSmiWithSaturation(Node* index, uint32_t maxval);
 
   void MemTypeToUintPtrOrOOBTrap(std::initializer_list<Node**> nodes,
                                  wasm::WasmCodePosition position);

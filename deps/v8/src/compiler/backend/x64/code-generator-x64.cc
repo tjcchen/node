@@ -80,10 +80,10 @@ class X64OperandConverter : public InstructionOperandConverter {
   }
 
   static ScaleFactor ScaleFor(AddressingMode one, AddressingMode mode) {
-    STATIC_ASSERT(0 == static_cast<int>(times_1));
-    STATIC_ASSERT(1 == static_cast<int>(times_2));
-    STATIC_ASSERT(2 == static_cast<int>(times_4));
-    STATIC_ASSERT(3 == static_cast<int>(times_8));
+    static_assert(0 == static_cast<int>(times_1));
+    static_assert(1 == static_cast<int>(times_2));
+    static_assert(2 == static_cast<int>(times_4));
+    static_assert(3 == static_cast<int>(times_8));
     int scale = static_cast<int>(mode - one);
     DCHECK(scale >= 0 && scale < 4);
     return static_cast<ScaleFactor>(scale);
@@ -2924,14 +2924,6 @@ CodeGenerator::CodeGenResult CodeGenerator::AssembleArchInstruction(
       __ Sqrtps(i.OutputSimd128Register(), i.InputSimd128Register(0));
       break;
     }
-    case kX64F32x4RecipApprox: {
-      __ Rcpps(i.OutputSimd128Register(), i.InputSimd128Register(0));
-      break;
-    }
-    case kX64F32x4RecipSqrtApprox: {
-      __ Rsqrtps(i.OutputSimd128Register(), i.InputSimd128Register(0));
-      break;
-    }
     case kX64F32x4Add: {
       ASSEMBLE_SIMD_BINOP(addps);
       break;
@@ -5077,7 +5069,7 @@ void CodeGenerator::AssembleMove(InstructionOperand* source,
         XMMRegister dst = g.ToDoubleRegister(destination);
         if (src.type() == Constant::kFloat32) {
           // TODO(turbofan): Can we do better here?
-          __ Move(dst, bit_cast<uint32_t>(src.ToFloat32()));
+          __ Move(dst, base::bit_cast<uint32_t>(src.ToFloat32()));
         } else {
           DCHECK_EQ(src.type(), Constant::kFloat64);
           __ Move(dst, src.ToFloat64().AsUint64());
@@ -5093,7 +5085,7 @@ void CodeGenerator::AssembleMove(InstructionOperand* source,
       } else {
         DCHECK(destination->IsFPStackSlot());
         if (src.type() == Constant::kFloat32) {
-          __ movl(dst, Immediate(bit_cast<uint32_t>(src.ToFloat32())));
+          __ movl(dst, Immediate(base::bit_cast<uint32_t>(src.ToFloat32())));
         } else {
           DCHECK_EQ(src.type(), Constant::kFloat64);
           __ Move(dst, src.ToFloat64().AsUint64());

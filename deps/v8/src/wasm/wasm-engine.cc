@@ -881,12 +881,13 @@ Handle<WasmModuleObject> WasmEngine::ImportNativeModule(
   return module_object;
 }
 
-CompilationStatistics* WasmEngine::GetOrCreateTurboStatistics() {
+std::shared_ptr<CompilationStatistics>
+WasmEngine::GetOrCreateTurboStatistics() {
   base::MutexGuard guard(&mutex_);
   if (compilation_stats_ == nullptr) {
     compilation_stats_.reset(new CompilationStatistics());
   }
-  return compilation_stats_.get();
+  return compilation_stats_;
 }
 
 void WasmEngine::DumpAndResetTurboStatistics() {
@@ -1683,7 +1684,7 @@ uint32_t max_mem_pages() {
   static_assert(
       kV8MaxWasmMemoryPages * kWasmPageSize <= JSArrayBuffer::kMaxByteLength,
       "Wasm memories must not be bigger than JSArrayBuffers");
-  STATIC_ASSERT(kV8MaxWasmMemoryPages <= kMaxUInt32);
+  static_assert(kV8MaxWasmMemoryPages <= kMaxUInt32);
   return std::min(uint32_t{kV8MaxWasmMemoryPages}, FLAG_wasm_max_mem_pages);
 }
 

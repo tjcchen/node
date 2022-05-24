@@ -8,6 +8,7 @@
 #include "src/heap/evacuation-allocator-inl.h"
 #include "src/heap/incremental-marking-inl.h"
 #include "src/heap/memory-chunk.h"
+#include "src/heap/new-spaces.h"
 #include "src/heap/scavenger.h"
 #include "src/objects/map.h"
 #include "src/objects/objects-inl.h"
@@ -245,7 +246,8 @@ SlotCallbackResult Scavenger::EvacuateObjectDefault(
   SLOW_DCHECK(static_cast<size_t>(object_size) <=
               MemoryChunkLayout::AllocatableMemoryInDataPage());
 
-  if (!heap()->ShouldBePromoted(object.address())) {
+  if (!SemiSpaceNewSpace::From(heap()->new_space())
+           ->ShouldBePromoted(object.address())) {
     // A semi-space copy may fail due to fragmentation. In that case, we
     // try to promote the object.
     result = SemiSpaceCopyObject(map, slot, object, object_size, object_fields);
@@ -529,7 +531,7 @@ int ScavengeVisitor::VisitEphemeronHashTable(Map map,
                                              EphemeronHashTable table) {
   // Register table with the scavenger, so it can take care of the weak keys
   // later. This allows to only iterate the tables' values, which are treated
-  // as strong independetly of whether the key is live.
+  // as strong independently of whether the key is live.
   scavenger_->AddEphemeronHashTable(table);
   for (InternalIndex i : table.IterateEntries()) {
     ObjectSlot value_slot =

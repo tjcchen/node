@@ -1243,7 +1243,7 @@ void AccessorAssembler::HandleStoreICHandlerCase(
         if_slow(this);
 
 #define ASSERT_CONSECUTIVE(a, b)                                    \
-  STATIC_ASSERT(static_cast<intptr_t>(StoreHandler::Kind::a) + 1 == \
+  static_assert(static_cast<intptr_t>(StoreHandler::Kind::a) + 1 == \
                 static_cast<intptr_t>(StoreHandler::Kind::b));
     ASSERT_CONSECUTIVE(kGlobalProxy, kNormal)
     ASSERT_CONSECUTIVE(kNormal, kInterceptor)
@@ -1282,7 +1282,7 @@ void AccessorAssembler::HandleStoreICHandlerCase(
         const int kTypeAndReadOnlyMask =
             PropertyDetails::KindField::kMask |
             PropertyDetails::kAttributesReadOnlyMask;
-        STATIC_ASSERT(static_cast<int>(PropertyKind::kData) == 0);
+        static_assert(static_cast<int>(PropertyKind::kData) == 0);
         GotoIf(IsSetWord32(details, kTypeAndReadOnlyMask), miss);
 
         if (V8_DICT_PROPERTY_CONST_TRACKING_BOOL) {
@@ -1460,7 +1460,7 @@ void AccessorAssembler::HandleStoreICTransitionMapHandlerCase(
         PropertyDetails::KindField::kMask |
         PropertyDetails::kAttributesDontDeleteMask |
         PropertyDetails::kAttributesReadOnlyMask;
-    STATIC_ASSERT(static_cast<int>(PropertyKind::kData) == 0);
+    static_assert(static_cast<int>(PropertyKind::kData) == 0);
     // Both DontDelete and ReadOnly attributes must not be set and it has to be
     // a kData property.
     GotoIf(IsSetWord32(details, kKindAndAttributesDontDeleteReadOnlyMask),
@@ -1836,7 +1836,7 @@ void AccessorAssembler::HandleStoreICProtoHandler(
         const int kTypeAndReadOnlyMask =
             PropertyDetails::KindField::kMask |
             PropertyDetails::kAttributesReadOnlyMask;
-        STATIC_ASSERT(static_cast<int>(PropertyKind::kData) == 0);
+        static_assert(static_cast<int>(PropertyKind::kData) == 0);
         GotoIf(IsSetWord32(details, kTypeAndReadOnlyMask), miss);
 
         StoreValueByKeyIndex<PropertyDictionary>(properties, name_index,
@@ -2398,7 +2398,7 @@ void AccessorAssembler::EmitElementLoad(
         int16_elements(this), uint32_elements(this), int32_elements(this),
         float32_elements(this), float64_elements(this), bigint64_elements(this),
         biguint64_elements(this);
-    STATIC_ASSERT(LAST_ELEMENTS_KIND ==
+    static_assert(LAST_ELEMENTS_KIND ==
                   LAST_RAB_GSAB_FIXED_TYPED_ARRAY_ELEMENTS_KIND);
     GotoIf(Int32GreaterThanOrEqual(
                elements_kind,
@@ -2632,7 +2632,6 @@ void AccessorAssembler::GenericElementLoad(
 
   // Unimplemented elements kinds fall back to a runtime call.
   Label* unimplemented_elements_kind = slow;
-  IncrementCounter(isolate()->counters()->ic_keyed_load_generic_smi(), 1);
   EmitElementLoad(lookup_start_object, elements_kind, index,
                   is_jsarray_condition, &if_element_hole, &rebox_double,
                   &var_double_value, unimplemented_elements_kind, &if_oob, slow,
@@ -2673,7 +2672,6 @@ void AccessorAssembler::GenericElementLoad(
     Comment("load string character");
     TNode<IntPtrT> length = LoadStringLengthAsWord(CAST(lookup_start_object));
     GotoIfNot(UintPtrLessThan(index, length), slow);
-    IncrementCounter(isolate()->counters()->ic_keyed_load_generic_smi(), 1);
     TailCallBuiltin(Builtin::kStringCharAt, NoContextConstant(),
                     lookup_start_object, index);
   }
@@ -2788,7 +2786,6 @@ void AccessorAssembler::GenericPropertyLoad(
     TNode<Object> value = CallGetterIfAccessor(
         var_value.value(), lookup_start_object, var_details.value(),
         p->context(), p->receiver(), p->name(), slow);
-    IncrementCounter(isolate()->counters()->ic_keyed_load_generic_symbol(), 1);
     Return(value);
   }
 
@@ -3640,7 +3637,6 @@ void AccessorAssembler::KeyedLoadICGeneric(const LoadICParameters* p) {
   BIND(&if_runtime);
   {
     Comment("KeyedLoadGeneric_slow");
-    IncrementCounter(isolate()->counters()->ic_keyed_load_generic_slow(), 1);
     // TODO(jkummerow): Should we use the GetProperty TF stub instead?
     TailCallRuntime(Runtime::kGetProperty, p->context(),
                     p->receiver_and_lookup_start_object(), var_name.value());

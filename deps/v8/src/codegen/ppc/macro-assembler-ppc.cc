@@ -297,6 +297,24 @@ void TurboAssembler::Drop(Register count, Register scratch) {
   add(sp, sp, scratch);
 }
 
+void MacroAssembler::TestCodeTIsMarkedForDeoptimization(Register codet,
+                                                        Register scratch1,
+                                                        Register scratch2) {
+  LoadTaggedPointerField(scratch1,
+                         FieldMemOperand(codet, Code::kCodeDataContainerOffset),
+                         scratch2);
+  LoadS32(
+      scratch1,
+      FieldMemOperand(scratch1, CodeDataContainer::kKindSpecificFlagsOffset),
+      scratch2);
+  TestBit(scratch1, Code::kMarkedForDeoptimizationBit, scratch2);
+}
+
+Operand MacroAssembler::ClearedValue() const {
+  return Operand(
+      static_cast<int32_t>(HeapObjectReference::ClearedValue(isolate()).ptr()));
+}
+
 void TurboAssembler::Call(Label* target) { b(target, SetLK); }
 
 void TurboAssembler::Push(Handle<HeapObject> handle) {
@@ -577,6 +595,14 @@ void TurboAssembler::StoreTaggedField(const Register& value,
     StoreU32(value, dst_field_operand, scratch);
     RecordComment("]");
   } else {
+    // TODO(miladfarca): move this block into StoreU64.
+    if (CpuFeatures::IsSupported(PPC_10_PLUS)) {
+      if (dst_field_operand.rb() == no_reg &&
+          is_int34(dst_field_operand.offset())) {
+        pstd(value, dst_field_operand);
+        return;
+      }
+    }
     StoreU64(value, dst_field_operand, scratch);
   }
 }
@@ -673,8 +699,8 @@ void MacroAssembler::RecordWriteField(Register object, int offset,
   // Clobber clobbered input registers when running with the debug-code flag
   // turned on to provoke errors.
   if (FLAG_debug_code) {
-    mov(value, Operand(bit_cast<intptr_t>(kZapValue + 4)));
-    mov(slot_address, Operand(bit_cast<intptr_t>(kZapValue + 8)));
+    mov(value, Operand(base::bit_cast<intptr_t>(kZapValue + 4)));
+    mov(slot_address, Operand(base::bit_cast<intptr_t>(kZapValue + 8)));
   }
 }
 
@@ -824,8 +850,8 @@ void MacroAssembler::RecordWrite(Register object, Register slot_address,
   // Clobber clobbered registers when running with the debug-code flag
   // turned on to provoke errors.
   if (FLAG_debug_code) {
-    mov(slot_address, Operand(bit_cast<intptr_t>(kZapValue + 12)));
-    mov(value, Operand(bit_cast<intptr_t>(kZapValue + 16)));
+    mov(slot_address, Operand(base::bit_cast<intptr_t>(kZapValue + 12)));
+    mov(value, Operand(base::bit_cast<intptr_t>(kZapValue + 16)));
   }
 }
 
@@ -1124,7 +1150,7 @@ void TurboAssembler::ShiftRightAlgPair(Register dst_low, Register dst_high,
 void TurboAssembler::LoadConstantPoolPointerRegisterFromCodeTargetAddress(
     Register code_target_address) {
   // Builtins do not use the constant pool (see is_constant_pool_available).
-  STATIC_ASSERT(Code::kOnHeapBodyIsContiguous);
+  static_assert(Code::kOnHeapBodyIsContiguous);
 
   lwz(r0, MemOperand(code_target_address,
                      Code::kInstructionSizeOffset - Code::kHeaderSize));
@@ -1150,7 +1176,7 @@ void TurboAssembler::ComputeCodeStartAddress(Register dst) {
 void TurboAssembler::LoadConstantPoolPointerRegister() {
   //
   // Builtins do not use the constant pool (see is_constant_pool_available).
-  STATIC_ASSERT(Code::kOnHeapBodyIsContiguous);
+  static_assert(Code::kOnHeapBodyIsContiguous);
 
   LoadPC(kConstantPoolRegister);
   int32_t delta = -pc_offset() + 4;
@@ -1190,7 +1216,7 @@ void TurboAssembler::DropArguments(Register count, ArgumentsCountType type,
       break;
     }
     case kCountIsSmi: {
-      STATIC_ASSERT(kSmiTagSize == 1 && kSmiTag == 0);
+      static_assert(kSmiTagSize == 1 && kSmiTag == 0);
       SmiToPtrArrayOffset(count, count);
       add(sp, sp, count);
       break;
@@ -1227,11 +1253,17 @@ void TurboAssembler::EnterFrame(StackFrame::Type type,
     // This path cannot rely on ip containing code entry.
     PushCommonFrame();
     LoadConstantPoolPointerRegister();
-    mov(ip, Operand(StackFrame::TypeToMarker(type)));
-    push(ip);
+    if (!StackFrame::IsJavaScript(type)) {
+      mov(ip, Operand(StackFrame::TypeToMarker(type)));
+      push(ip);
+    }
   } else {
-    mov(ip, Operand(StackFrame::TypeToMarker(type)));
-    PushCommonFrame(ip);
+    Register scratch = no_reg;
+    if (!StackFrame::IsJavaScript(type)) {
+      scratch = ip;
+      mov(scratch, Operand(StackFrame::TypeToMarker(type)));
+    }
+    PushCommonFrame(scratch);
   }
 #if V8_ENABLE_WEBASSEMBLY
   if (type == StackFrame::WASM) Push(kWasmInstanceRegister);
@@ -1643,8 +1675,8 @@ void MacroAssembler::InvokeFunction(Register function,
 
 void MacroAssembler::PushStackHandler() {
   // Adjust this code if not the case.
-  STATIC_ASSERT(StackHandlerConstants::kSize == 2 * kSystemPointerSize);
-  STATIC_ASSERT(StackHandlerConstants::kNextOffset == 0 * kSystemPointerSize);
+  static_assert(StackHandlerConstants::kSize == 2 * kSystemPointerSize);
+  static_assert(StackHandlerConstants::kNextOffset == 0 * kSystemPointerSize);
 
   Push(Smi::zero());  // Padding.
 
@@ -1660,8 +1692,8 @@ void MacroAssembler::PushStackHandler() {
 }
 
 void MacroAssembler::PopStackHandler() {
-  STATIC_ASSERT(StackHandlerConstants::kSize == 2 * kSystemPointerSize);
-  STATIC_ASSERT(StackHandlerConstants::kNextOffset == 0);
+  static_assert(StackHandlerConstants::kSize == 2 * kSystemPointerSize);
+  static_assert(StackHandlerConstants::kNextOffset == 0);
 
   pop(r4);
   Move(ip,
@@ -1681,8 +1713,8 @@ void MacroAssembler::CompareObjectType(Register object, Register map,
 
 void MacroAssembler::CompareInstanceType(Register map, Register type_reg,
                                          InstanceType type) {
-  STATIC_ASSERT(Map::kInstanceTypeOffset < 4096);
-  STATIC_ASSERT(LAST_TYPE <= 0xFFFF);
+  static_assert(Map::kInstanceTypeOffset < 4096);
+  static_assert(LAST_TYPE <= 0xFFFF);
   lhz(type_reg, FieldMemOperand(map, Map::kInstanceTypeOffset));
   cmpi(type_reg, Operand(type));
 }
@@ -2106,7 +2138,7 @@ void MacroAssembler::LoadNativeContextSlot(Register dst, int index) {
 
 void TurboAssembler::AssertNotSmi(Register object) {
   if (FLAG_debug_code) {
-    STATIC_ASSERT(kSmiTag == 0);
+    static_assert(kSmiTag == 0);
     TestIfSmi(object, r0);
     Check(ne, AbortReason::kOperandIsASmi, cr0);
   }
@@ -2114,7 +2146,7 @@ void TurboAssembler::AssertNotSmi(Register object) {
 
 void TurboAssembler::AssertSmi(Register object) {
   if (FLAG_debug_code) {
-    STATIC_ASSERT(kSmiTag == 0);
+    static_assert(kSmiTag == 0);
     TestIfSmi(object, r0);
     Check(eq, AbortReason::kOperandIsNotASmi, cr0);
   }
@@ -2122,7 +2154,7 @@ void TurboAssembler::AssertSmi(Register object) {
 
 void MacroAssembler::AssertConstructor(Register object) {
   if (FLAG_debug_code) {
-    STATIC_ASSERT(kSmiTag == 0);
+    static_assert(kSmiTag == 0);
     TestIfSmi(object, r0);
     Check(ne, AbortReason::kOperandIsASmiAndNotAConstructor, cr0);
     push(object);
@@ -2136,7 +2168,7 @@ void MacroAssembler::AssertConstructor(Register object) {
 
 void MacroAssembler::AssertFunction(Register object) {
   if (FLAG_debug_code) {
-    STATIC_ASSERT(kSmiTag == 0);
+    static_assert(kSmiTag == 0);
     TestIfSmi(object, r0);
     Check(ne, AbortReason::kOperandIsASmiAndNotAFunction, cr0);
     push(object);
@@ -2151,7 +2183,7 @@ void MacroAssembler::AssertFunction(Register object) {
 void MacroAssembler::AssertCallableFunction(Register object) {
   if (!FLAG_debug_code) return;
   ASM_CODE_COMMENT(this);
-  STATIC_ASSERT(kSmiTag == 0);
+  static_assert(kSmiTag == 0);
   TestIfSmi(object, r0);
   Check(ne, AbortReason::kOperandIsASmiAndNotAFunction, cr0);
   push(object);
@@ -2164,7 +2196,7 @@ void MacroAssembler::AssertCallableFunction(Register object) {
 
 void MacroAssembler::AssertBoundFunction(Register object) {
   if (FLAG_debug_code) {
-    STATIC_ASSERT(kSmiTag == 0);
+    static_assert(kSmiTag == 0);
     TestIfSmi(object, r0);
     Check(ne, AbortReason::kOperandIsASmiAndNotABoundFunction, cr0);
     push(object);
@@ -3213,8 +3245,9 @@ void MacroAssembler::AndSmiLiteral(Register dst, Register src, Smi smi,
   }
 
 #define MEM_OP_WITH_ALIGN_LIST(V) \
-  V(LoadU64, ld, ldx)             \
   V(LoadS32, lwa, lwax)           \
+  V(LoadU64, ld, ldx)             \
+  V(LoadU64WithUpdate, ldu, ldux) \
   V(StoreU64, std, stdx)          \
   V(StoreU64WithUpdate, stdu, stdux)
 
@@ -3239,7 +3272,6 @@ MEM_OP_WITH_ALIGN_LIST(MEM_OP_WITH_ALIGN_FUNCTION)
   V(LoadF32, DoubleRegister, lfs, lfsx)                \
   V(StoreF64, DoubleRegister, stfd, stfdx)             \
   V(StoreF32, DoubleRegister, stfs, stfsx)             \
-  V(LoadU64WithUpdate, Register, ldu, ldux)            \
   V(LoadF64WithUpdate, DoubleRegister, lfdu, lfdux)    \
   V(LoadF32WithUpdate, DoubleRegister, lfsu, lfsux)    \
   V(StoreF64WithUpdate, DoubleRegister, stfdu, stfdux) \
@@ -3597,9 +3629,9 @@ void TurboAssembler::JumpIfLessThan(Register x, int32_t y, Label* dest) {
 }
 
 void TurboAssembler::LoadEntryFromBuiltinIndex(Register builtin_index) {
-  STATIC_ASSERT(kSystemPointerSize == 8);
-  STATIC_ASSERT(kSmiTagSize == 1);
-  STATIC_ASSERT(kSmiTag == 0);
+  static_assert(kSystemPointerSize == 8);
+  static_assert(kSmiTagSize == 1);
+  static_assert(kSmiTag == 0);
 
   // The builtin_index register contains the builtin index as a Smi.
   if (SmiValuesAre32Bits()) {

@@ -54,6 +54,160 @@ d8.file.execute('test/mjsunit/web-snapshot/web-snapshot-helpers.js');
   assertEquals([5, 6, 7], foo.array);
 })();
 
+(function TestHoleySmiElementsArray() {
+  function createObjects() {
+    globalThis.foo = [1,,2];
+  }
+  const {foo} = takeAndUseWebSnapshot(createObjects, ['foo']);
+  assertEquals([1,,2], foo);
+})();
+
+(function TestHoleyElementsArray() {
+  function createObjects() {
+    globalThis.foo = [1,,"123"];
+  }
+  const {foo} = takeAndUseWebSnapshot(createObjects, ['foo']);
+  assertEquals([1,,"123"], foo);
+})();
+
+(function TestPackedDoubleElementsArray() {
+  function createObjects() {
+    globalThis.foo = [1.2, 2.3];
+  }
+  const { foo } = takeAndUseWebSnapshot(createObjects, ['foo']);
+  assertEquals([1.2, 2.3], foo);
+})();
+
+(function TestArrayContainingDoubleAndSmi() {
+  function createObjects() {
+    globalThis.foo = [1.2, 1];
+  }
+  const { foo } = takeAndUseWebSnapshot(createObjects, ['foo']);
+  assertEquals([1.2, 1], foo);
+})();
+
+(function TestHoleyArrayContainingDoubleAndSmi() {
+  function createObjects() {
+    globalThis.foo = [1.2, , 1];
+  }
+  const { foo } = takeAndUseWebSnapshot(createObjects, ['foo']);
+  assertEquals([1.2, , 1], foo);
+})();
+
+(function TestArrayContainingDoubleAndObject() {
+  function createObjects() {
+    globalThis.foo = [1.2, {'key': 'value'}];
+  }
+  const { foo } = takeAndUseWebSnapshot(createObjects, ['foo']);
+  assertEquals([1.2, {'key': 'value'}], foo);
+})();
+
+(function TestHoleyArrayContainingDoubleAndObject() {
+  function createObjects() {
+    globalThis.foo = [1.2, , {'key': 'value'}];
+  }
+  const { foo } = takeAndUseWebSnapshot(createObjects, ['foo']);
+  assertEquals([1.2, , {'key': 'value'}], foo);
+})();
+
+(function TestHoleyDoubleElementsArray() {
+  function createObjects() {
+    globalThis.foo = [1.2, , 2.3];
+  }
+  const {foo} = takeAndUseWebSnapshot(createObjects, ['foo']);
+  assertEquals([1.2, , 2.3], foo);
+})();
+
+(function TestDictionaryElementsArray() {
+  function createObjects() {
+    const array = [];
+    // Add a large index to force dictionary elements.
+    array[2 ** 30] = 10;
+    for (let i = 0; i < 10; i++) {
+      array[i * 101] = i;
+    }
+    globalThis.foo = array;
+  }
+  const { foo } = takeAndUseWebSnapshot(createObjects, ['foo']);
+  assertTrue(%HasDictionaryElements(foo));
+  assertEquals(2 ** 30 + 1, foo.length);
+  for (let i = 0; i < 10; i++) {
+    assertEquals(i,foo[i * 101]);
+  }
+})();
+
+(function TestDictionaryElementsArrayContainingArray() {
+  function createObjects() {
+    const array = [];
+    // Add a large index to force dictionary elements.
+    array[2 ** 30] = 10;
+    for (let i = 0; i < 10; i++) {
+      array[i * 101] = [i];
+    }
+    globalThis.foo = array;
+  }
+  const { foo } = takeAndUseWebSnapshot(createObjects, ['foo']);
+  assertTrue(%HasDictionaryElements(foo));
+  assertEquals(2 ** 30 + 1, foo.length);
+  for (let i = 0; i < 10; i++) {
+    assertEquals([i],foo[i * 101]);
+  }
+})();
+
+(function TestDictionaryElementsArrayContainingObject() {
+  function createObjects() {
+    const array = [];
+    // Add a large index to force dictionary elements.
+    array[2 ** 30] = 10;
+    for (let i = 0; i < 10; i++) {
+      array[i * 101] = {i:i};
+    }
+    globalThis.foo = array;
+  }
+  const { foo } = takeAndUseWebSnapshot(createObjects, ['foo']);
+  assertTrue(%HasDictionaryElements(foo));
+  assertEquals(2 ** 30 + 1, foo.length);
+  for (let i = 0; i < 10; i++) {
+    assertEquals({i:i}, foo[i * 101]);
+  }
+})();
+
+(function TestDictionaryElementsArrayContainingFunction() {
+  function createObjects() {
+    const array = [];
+    // Add a large index to force dictionary elements.
+    array[2 ** 30] = 10;
+    for (let i = 0; i < 10; i++) {
+      array[i * 101] = function() { return i; };
+    }
+    globalThis.foo = array;
+  }
+  const { foo } = takeAndUseWebSnapshot(createObjects, ['foo']);
+  assertTrue(%HasDictionaryElements(foo));
+  assertEquals(2 ** 30 + 1, foo.length);
+  for (let i = 0; i < 10; i++) {
+    assertEquals(i, foo[i * 101]());
+  }
+})();
+
+(function TestDictionaryElementsArrayContainingString() {
+  function createObjects() {
+    const array = [];
+    // Add a large index to force dictionary elements.
+    array[2 ** 30] = 10;
+    for (let i = 0; i < 10; i++) {
+      array[i * 101] = `${i}`;
+    }
+    globalThis.foo = array;
+  }
+  const { foo } = takeAndUseWebSnapshot(createObjects, ['foo']);
+  assertTrue(%HasDictionaryElements(foo));
+  assertEquals(2 ** 30 + 1, foo.length);
+  for (let i = 0; i < 10; i++) {
+    assertEquals(`${i}`, foo[i * 101]);
+  }
+})();
+
 (function TestEmptyArray() {
   function createObjects() {
     globalThis.foo = {
@@ -187,6 +341,35 @@ d8.file.execute('test/mjsunit/web-snapshot/web-snapshot-helpers.js');
   assertEquals(7, x.f());
 })();
 
+(function TestDerivedClass() {
+  function createObjects() {
+    globalThis.Base = class { f() { return 8; }};
+    globalThis.Foo = class extends Base { };
+  }
+  const realm = Realm.create();
+  const { Foo, Base } = takeAndUseWebSnapshot(createObjects, ['Foo', 'Base'], realm);
+  assertEquals(Base.prototype, Foo.prototype.__proto__);
+  assertEquals(Base, Foo.__proto__);
+  const x = new Foo();
+  assertEquals(8, x.f());
+})();
+
+(function TestDerivedClassWithConstructor() {
+  function createObjects() {
+    globalThis.Base = class { constructor() {this.m = 43;}};
+    globalThis.Foo = class extends Base{
+      constructor() {
+        super();
+        this.n = 42;
+      }
+    };
+  }
+  const { Foo } = takeAndUseWebSnapshot(createObjects, ['Foo']);
+  const x = new Foo();
+  assertEquals(42, x.n);
+  assertEquals(43, x.m);
+})();
+
 (async function TestClassWithAsyncMethods() {
   function createObjects() {
     globalThis.Foo = class {
@@ -290,8 +473,14 @@ d8.file.execute('test/mjsunit/web-snapshot/web-snapshot-helpers.js');
     globalThis.Sub.prototype = Object.create(Super.prototype);
     globalThis.Sub.prototype.subfunc = function() { return 'subfunc'; };
   }
-  const { Sub } = takeAndUseWebSnapshot(createObjects, ['Sub']);
+  const realm = Realm.create();
+  const { Sub, Super } =
+      takeAndUseWebSnapshot(createObjects, ['Sub', 'Super'], realm);
   const o = new Sub();
   assertEquals('superfunc', o.superfunc());
   assertEquals('subfunc', o.subfunc());
+  assertSame(Super.prototype, Sub.prototype.__proto__);
+  const realmFunctionPrototype = Realm.eval(realm, 'Function.prototype');
+  assertSame(realmFunctionPrototype, Super.__proto__);
+  assertSame(realmFunctionPrototype, Sub.__proto__);
 })();

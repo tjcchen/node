@@ -765,7 +765,6 @@
   V(SignExtendWord8ToInt64)              \
   V(SignExtendWord16ToInt64)             \
   V(SignExtendWord32ToInt64)             \
-  V(UnsafePointerAdd)                    \
   V(StackPointerGreaterThan)
 
 #define MACHINE_SIMD_OP_LIST(V)  \
@@ -804,8 +803,6 @@
   V(F32x4Abs)                    \
   V(F32x4Neg)                    \
   V(F32x4Sqrt)                   \
-  V(F32x4RecipApprox)            \
-  V(F32x4RecipSqrtApprox)        \
   V(F32x4Add)                    \
   V(F32x4Sub)                    \
   V(F32x4Mul)                    \
@@ -994,6 +991,7 @@
   V(I32x4RelaxedTruncF32x4U)     \
   V(I32x4RelaxedTruncF64x2SZero) \
   V(I32x4RelaxedTruncF64x2UZero) \
+  V(I16x8RelaxedQ15MulRS)        \
   V(I8x16Shuffle)                \
   V(V128AnyTrue)                 \
   V(I64x2AllTrue)                \

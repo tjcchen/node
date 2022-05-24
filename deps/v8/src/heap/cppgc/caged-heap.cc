@@ -8,21 +8,22 @@
 #error "Must be compiled with caged heap enabled"
 #endif
 
-#include "src/heap/cppgc/caged-heap.h"
-
 #include "include/cppgc/internal/caged-heap-local-data.h"
+#include "include/cppgc/member.h"
 #include "include/cppgc/platform.h"
 #include "src/base/bounded-page-allocator.h"
 #include "src/base/logging.h"
 #include "src/base/platform/platform.h"
+#include "src/heap/cppgc/caged-heap.h"
 #include "src/heap/cppgc/globals.h"
+#include "src/heap/cppgc/member.h"
 
 namespace cppgc {
 namespace internal {
 
-STATIC_ASSERT(api_constants::kCagedHeapReservationSize ==
+static_assert(api_constants::kCagedHeapReservationSize ==
               kCagedHeapReservationSize);
-STATIC_ASSERT(api_constants::kCagedHeapReservationAlignment ==
+static_assert(api_constants::kCagedHeapReservationAlignment ==
               kCagedHeapReservationAlignment);
 
 namespace {
@@ -52,6 +53,13 @@ CagedHeap::CagedHeap(HeapBase& heap_base, PageAllocator& platform_allocator)
     : reserved_area_(ReserveCagedHeap(platform_allocator)) {
   using CagedAddress = CagedHeap::AllocatorType::Address;
 
+#if defined(CPPGC_POINTER_COMPRESSION)
+  // With pointer compression only single heap per thread is allowed.
+  CHECK(!CageBaseGlobal::IsSet());
+  CageBaseGlobalUpdater::UpdateCageBase(
+      reinterpret_cast<uintptr_t>(reserved_area_.address()));
+#endif  // defined(CPPGC_POINTER_COMPRESSION)
+
   const bool is_not_oom = platform_allocator.SetPermissions(
       reserved_area_.address(),
       RoundUp(sizeof(CagedHeapLocalData), platform_allocator.CommitPageSize()),
@@ -73,8 +81,23 @@ CagedHeap::CagedHeap(HeapBase& heap_base, PageAllocator& platform_allocator)
   bounded_allocator_ = std::make_unique<v8::base::BoundedPageAllocator>(
       &platform_allocator, caged_heap_start,
       reserved_area_.size() - local_data_size_with_padding, kPageSize,
-      v8::base::PageInitializationMode::kAllocatedPagesMustBeZeroInitialized);
+      v8::base::PageInitializationMode::kAllocatedPagesMustBeZeroInitialized,
+      v8::base::PageFreeingMode::kMakeInaccessible);
 }
+
+CagedHeap::~CagedHeap() {
+#if defined(CPPGC_POINTER_COMPRESSION)
+  CHECK_EQ(reinterpret_cast<uintptr_t>(reserved_area_.address()),
+           CageBaseGlobalUpdater::GetCageBase());
+  CageBaseGlobalUpdater::UpdateCageBase(0u);
+#endif  // defined(CPPGC_POINTER_COMPRESSION)
+}
+
+#if defined(CPPGC_YOUNG_GENERATION)
+void CagedHeap::EnableGenerationalGC() {
+  local_data().is_young_generation_enabled = true;
+}
+#endif  // defined(CPPGC_YOUNG_GENERATION)
 
 }  // namespace internal
 }  // namespace cppgc

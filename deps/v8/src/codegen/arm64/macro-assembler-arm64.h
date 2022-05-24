@@ -1552,7 +1552,7 @@ class V8_EXPORT_PRIVATE MacroAssembler : public TurboAssembler {
 #undef DECLARE_FUNCTION
 
   // Branch type inversion relies on these relations.
-  STATIC_ASSERT((reg_zero == (reg_not_zero ^ 1)) &&
+  static_assert((reg_zero == (reg_not_zero ^ 1)) &&
                 (reg_bit_clear == (reg_bit_set ^ 1)) &&
                 (always == (never ^ 1)));
 
@@ -1837,6 +1837,10 @@ class V8_EXPORT_PRIVATE MacroAssembler : public TurboAssembler {
   void DecodeField(Register reg) {
     DecodeField<Field>(reg, reg);
   }
+
+  void JumpIfCodeTIsMarkedForDeoptimization(
+      Register codet, Register scratch, Label* if_marked_for_deoptimization);
+  Operand ClearedValue() const;
 
   Operand ReceiverOperand(const Register arg_count);
 

@@ -1147,6 +1147,12 @@ class Assembler : public AssemblerBase {
   void pld(Register dst, const MemOperand& src);
   void plfs(DoubleRegister dst, const MemOperand& src);
   void plfd(DoubleRegister dst, const MemOperand& src);
+  void pstb(Register src, const MemOperand& dst);
+  void psth(Register src, const MemOperand& dst);
+  void pstw(Register src, const MemOperand& dst);
+  void pstd(Register src, const MemOperand& dst);
+  void pstfs(const DoubleRegister src, const MemOperand& dst);
+  void pstfd(const DoubleRegister src, const MemOperand& dst);
 
   // Pseudo instructions
 
@@ -1382,7 +1388,7 @@ class Assembler : public AssemblerBase {
   // not have to check for overflow. The same is true for writes of large
   // relocation info entries.
   static constexpr int kGap = 32;
-  STATIC_ASSERT(AssemblerBase::kMinimalBufferSize >= 2 * kGap);
+  static_assert(AssemblerBase::kMinimalBufferSize >= 2 * kGap);
 
   RelocInfoWriter reloc_info_writer;
 

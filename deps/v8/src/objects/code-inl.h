@@ -536,7 +536,7 @@ int Code::CodeSize() const { return SizeFor(raw_body_size()); }
 DEF_GETTER(Code, Size, int) { return CodeSize(); }
 
 CodeKind Code::kind() const {
-  STATIC_ASSERT(FIELD_SIZE(kFlagsOffset) == kInt32Size);
+  static_assert(FIELD_SIZE(kFlagsOffset) == kInt32Size);
   const uint32_t flags = RELAXED_READ_UINT32_FIELD(*this, kFlagsOffset);
   return KindField::decode(flags);
 }
@@ -612,7 +612,7 @@ void Code::initialize_flags(CodeKind kind, bool is_turbofanned, int stack_slots,
                    IsTurbofannedField::encode(is_turbofanned) |
                    StackSlotsField::encode(stack_slots) |
                    IsOffHeapTrampoline::encode(is_off_heap_trampoline);
-  STATIC_ASSERT(FIELD_SIZE(kFlagsOffset) == kInt32Size);
+  static_assert(FIELD_SIZE(kFlagsOffset) == kInt32Size);
   RELAXED_WRITE_UINT32_FIELD(*this, kFlagsOffset, flags);
   DCHECK_IMPLIES(stack_slots != 0, uses_safepoint_table());
   DCHECK_IMPLIES(!uses_safepoint_table(), stack_slots == 0);
@@ -727,6 +727,14 @@ unsigned Code::inlined_bytecode_size() const {
 void Code::set_inlined_bytecode_size(unsigned size) {
   DCHECK(CodeKindIsOptimizedJSFunction(kind()) || size == 0);
   RELAXED_WRITE_UINT_FIELD(*this, kInlinedBytecodeSizeOffset, size);
+}
+
+BytecodeOffset Code::osr_offset() const {
+  return BytecodeOffset(RELAXED_READ_INT32_FIELD(*this, kOsrOffsetOffset));
+}
+
+void Code::set_osr_offset(BytecodeOffset offset) {
+  RELAXED_WRITE_INT32_FIELD(*this, kOsrOffsetOffset, offset.ToInt());
 }
 
 bool Code::uses_safepoint_table() const {
@@ -901,7 +909,7 @@ bool Code::IsExecutable() {
 
 // This field has to have relaxed atomic accessors because it is accessed in the
 // concurrent marker.
-STATIC_ASSERT(FIELD_SIZE(CodeDataContainer::kKindSpecificFlagsOffset) ==
+static_assert(FIELD_SIZE(CodeDataContainer::kKindSpecificFlagsOffset) ==
               kInt32Size);
 RELAXED_INT32_ACCESSORS(CodeDataContainer, kind_specific_flags,
                         kKindSpecificFlagsOffset)
@@ -1064,8 +1072,8 @@ RELAXED_UINT16_ACCESSORS(CodeDataContainer, flags, kFlagsOffset)
 // Ensure builtin_id field fits into int16_t, so that we can rely on sign
 // extension to convert int16_t{-1} to kNoBuiltinId.
 // If the asserts fail, update the code that use kBuiltinIdOffset below.
-STATIC_ASSERT(static_cast<int>(Builtin::kNoBuiltinId) == -1);
-STATIC_ASSERT(Builtins::kBuiltinCount < std::numeric_limits<int16_t>::max());
+static_assert(static_cast<int>(Builtin::kNoBuiltinId) == -1);
+static_assert(Builtins::kBuiltinCount < std::numeric_limits<int16_t>::max());
 
 void CodeDataContainer::initialize_flags(CodeKind kind, Builtin builtin_id) {
   CHECK(V8_EXTERNAL_CODE_SPACE_BOOL);
@@ -1085,7 +1093,7 @@ Builtin CodeDataContainer::builtin_id() const {
   CHECK(V8_EXTERNAL_CODE_SPACE_BOOL);
   // Rely on sign-extension when converting int16_t to int to preserve
   // kNoBuiltinId value.
-  STATIC_ASSERT(static_cast<int>(static_cast<int16_t>(Builtin::kNoBuiltinId)) ==
+  static_assert(static_cast<int>(static_cast<int16_t>(Builtin::kNoBuiltinId)) ==
                 static_cast<int>(Builtin::kNoBuiltinId));
   int value = ReadField<int16_t>(kBuiltinIdOffset);
   return static_cast<Builtin>(value);
@@ -1187,48 +1195,10 @@ void BytecodeArray::set_incoming_new_target_or_generator_register(
   }
 }
 
-int BytecodeArray::osr_urgency() const {
-  return OsrUrgencyBits::decode(osr_urgency_and_install_target());
-}
-
-void BytecodeArray::set_osr_urgency(int urgency) {
-  DCHECK(0 <= urgency && urgency <= BytecodeArray::kMaxOsrUrgency);
-  STATIC_ASSERT(BytecodeArray::kMaxOsrUrgency <= OsrUrgencyBits::kMax);
-  uint32_t value = osr_urgency_and_install_target();
-  set_osr_urgency_and_install_target(OsrUrgencyBits::update(value, urgency));
-}
-
 BytecodeArray::Age BytecodeArray::bytecode_age() const {
   // Bytecode is aged by the concurrent marker.
   static_assert(kBytecodeAgeSize == kUInt16Size);
   return static_cast<Age>(RELAXED_READ_INT16_FIELD(*this, kBytecodeAgeOffset));
-}
-
-void BytecodeArray::reset_osr_urgency() { set_osr_urgency(0); }
-
-void BytecodeArray::RequestOsrAtNextOpportunity() {
-  set_osr_urgency(kMaxOsrUrgency);
-}
-
-int BytecodeArray::osr_install_target() {
-  return OsrInstallTargetBits::decode(osr_urgency_and_install_target());
-}
-
-void BytecodeArray::set_osr_install_target(BytecodeOffset jump_loop_offset) {
-  DCHECK_LE(jump_loop_offset.ToInt(), length());
-  set_osr_urgency_and_install_target(OsrInstallTargetBits::update(
-      osr_urgency_and_install_target(), OsrInstallTargetFor(jump_loop_offset)));
-}
-
-void BytecodeArray::reset_osr_install_target() {
-  uint32_t value = osr_urgency_and_install_target();
-  set_osr_urgency_and_install_target(
-      OsrInstallTargetBits::update(value, kNoOsrInstallTarget));
-}
-
-void BytecodeArray::reset_osr_urgency_and_install_target() {
-  set_osr_urgency_and_install_target(OsrUrgencyBits::encode(0) |
-                                     OsrInstallTargetBits::encode(0));
 }
 
 void BytecodeArray::set_bytecode_age(BytecodeArray::Age age) {

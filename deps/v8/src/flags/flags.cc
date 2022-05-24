@@ -277,6 +277,8 @@ struct Flag {
           break;
         case SetBy::kCommandLine:
           if (new_set_by == SetBy::kImplication && check_command_line_flags) {
+            // Exit instead of abort for certain testing situations.
+            if (FLAG_exit_on_contradictory_flags) base::OS::ExitProcess(0);
             if (is_bool_flag) {
               FATAL(
                   "Flag --%s: value implied by --%s conflicts with explicit "
@@ -290,6 +292,8 @@ struct Flag {
             }
           } else if (new_set_by == SetBy::kCommandLine &&
                      check_command_line_flags) {
+            // Exit instead of abort for certain testing situations.
+            if (FLAG_exit_on_contradictory_flags) base::OS::ExitProcess(0);
             if (is_bool_flag) {
               FATAL(
                   "Command-line provided flag --%s specified as both true and "
@@ -841,11 +845,15 @@ bool TriggerImplication(bool premise, const char* premise_name,
 void FlagList::EnforceFlagImplications() {
   flag_hash = 0;
   bool changed;
+  int iteration = 0;
   do {
     changed = false;
 #define FLAG_MODE_DEFINE_IMPLICATIONS
 #include "src/flags/flag-definitions.h"  // NOLINT(build/include)
 #undef FLAG_MODE_DEFINE_IMPLICATIONS
+    // Make sure flag definitions are not touring complete. A.k.a  avoid endless
+    // loops in case of buggy configurations.
+    CHECK_LT(iteration++, 1000);
   } while (changed);
 }
 

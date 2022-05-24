@@ -31,6 +31,11 @@ namespace test_run_wasm_relaxed_simd {
     EXPERIMENTAL_FLAG_SCOPE(relaxed_simd);                      \
     RunWasm_##name##_Impl(TestExecutionTier::kInterpreter);     \
   }                                                             \
+  TEST(RunWasm_##name##_liftoff) {                              \
+    EXPERIMENTAL_FLAG_SCOPE(relaxed_simd);                      \
+    FLAG_SCOPE(liftoff_only);                                   \
+    RunWasm_##name##_Impl(TestExecutionTier::kLiftoff);         \
+  }                                                             \
   void RunWasm_##name##_Impl(TestExecutionTier execution_tier)
 
 #if V8_TARGET_ARCH_X64 || V8_TARGET_ARCH_ARM64 || V8_TARGET_ARCH_S390X || \
@@ -224,16 +229,6 @@ WASM_RELAXED_SIMD_TEST(F64x2Qfms) {
 #endif  // V8_TARGET_ARCH_X64 || V8_TARGET_ARCH_ARM64 || V8_TARGET_ARCH_S390X ||
         // V8_TARGET_ARCH_PPC64 || V8_TARGET_ARCH_IA32 || V8_TARGET_ARCH_RISCV64
 
-WASM_RELAXED_SIMD_TEST(F32x4RecipApprox) {
-  RunF32x4UnOpTest(execution_tier, kExprF32x4RecipApprox, base::Recip,
-                   false /* !exact */);
-}
-
-WASM_RELAXED_SIMD_TEST(F32x4RecipSqrtApprox) {
-  RunF32x4UnOpTest(execution_tier, kExprF32x4RecipSqrtApprox, base::RecipSqrt,
-                   false /* !exact */);
-}
-
 #if V8_TARGET_ARCH_X64 || V8_TARGET_ARCH_IA32 || V8_TARGET_ARCH_ARM64 || \
     V8_TARGET_ARCH_ARM || V8_TARGET_ARCH_RISCV64
 namespace {
@@ -243,7 +238,7 @@ template <typename T, size_t N = kSimd128Size / sizeof(T)>
 std::array<uint8_t, kSimd128Size> as_uint8(const T* src) {
   std::array<uint8_t, kSimd128Size> arr;
   for (size_t i = 0; i < N; i++) {
-    WriteLittleEndianValue<T>(bit_cast<T*>(&arr[0]) + i, src[i]);
+    WriteLittleEndianValue<T>(base::bit_cast<T*>(&arr[0]) + i, src[i]);
   }
   return arr;
 }
@@ -386,11 +381,7 @@ WASM_RELAXED_SIMD_TEST(I32x4RelaxedTruncF32x4U) {
   IntRelaxedTruncFloatTest<uint32_t, float>(
       execution_tier, kExprI32x4RelaxedTruncF32x4U, kExprF32x4Splat);
 }
-#endif  // V8_TARGET_ARCH_X64 || V8_TARGET_ARCH_IA32 || V8_TARGET_ARCH_ARM64 ||
-        // V8_TARGET_ARCH_ARM || V8_TARGET_ARCH_RISCV64
 
-#if V8_TARGET_ARCH_X64 || V8_TARGET_ARCH_IA32 || V8_TARGET_ARCH_ARM64 || \
-    V8_TARGET_ARCH_RISCV64
 WASM_RELAXED_SIMD_TEST(I8x16RelaxedSwizzle) {
   // Output is only defined for indices in the range [0,15].
   WasmRunner<int32_t> r(execution_tier);
@@ -413,7 +404,14 @@ WASM_RELAXED_SIMD_TEST(I8x16RelaxedSwizzle) {
   }
 }
 #endif  // V8_TARGET_ARCH_X64 || V8_TARGET_ARCH_IA32 || V8_TARGET_ARCH_ARM64 ||
-        // V8_TARGET_ARCH_RISCV64
+        // V8_TARGET_ARCH_ARM || V8_TARGET_ARCH_RISCV64
+
+#if V8_TARGET_ARCH_ARM64 || V8_TARGET_ARCH_ARM
+WASM_RELAXED_SIMD_TEST(I16x8RelaxedQ15MulRS) {
+  RunI16x8BinOpTest<int16_t>(execution_tier, kExprI16x8RelaxedQ15MulRS,
+                             SaturateRoundingQMul<int16_t>);
+}
+#endif  // V8_TARGET_ARCH_ARM64 || V8_TARGET_ARCH_ARM
 
 #undef WASM_RELAXED_SIMD_TEST
 }  // namespace test_run_wasm_relaxed_simd

@@ -137,8 +137,12 @@ class V8_EXPORT_PRIVATE TurboAssembler
   // Move an immediate into an XMM register.
   void Move(XMMRegister dst, uint32_t src);
   void Move(XMMRegister dst, uint64_t src);
-  void Move(XMMRegister dst, float src) { Move(dst, bit_cast<uint32_t>(src)); }
-  void Move(XMMRegister dst, double src) { Move(dst, bit_cast<uint64_t>(src)); }
+  void Move(XMMRegister dst, float src) {
+    Move(dst, base::bit_cast<uint32_t>(src));
+  }
+  void Move(XMMRegister dst, double src) {
+    Move(dst, base::bit_cast<uint64_t>(src));
+  }
 
   Operand EntryFromBuiltinAsOperand(Builtin builtin);
 
@@ -529,8 +533,8 @@ class V8_EXPORT_PRIVATE MacroAssembler : public TurboAssembler {
 
   // Smi tagging support.
   void SmiTag(Register reg) {
-    STATIC_ASSERT(kSmiTag == 0);
-    STATIC_ASSERT(kSmiTagSize == 1);
+    static_assert(kSmiTag == 0);
+    static_assert(kSmiTagSize == 1);
     add(reg, reg);
   }
 
@@ -556,6 +560,9 @@ class V8_EXPORT_PRIVATE MacroAssembler : public TurboAssembler {
     }
     and_(reg, Immediate(mask));
   }
+
+  void TestCodeTIsMarkedForDeoptimization(Register codet, Register scratch);
+  Immediate ClearedValue() const;
 
   // Abort execution if argument is not a smi, enabled via --debug-code.
   void AssertSmi(Register object);

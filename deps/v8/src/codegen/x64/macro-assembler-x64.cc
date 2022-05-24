@@ -1250,7 +1250,7 @@ void TurboAssembler::Cmp(Register dst, int32_t src) {
 }
 
 void TurboAssembler::SmiTag(Register reg) {
-  STATIC_ASSERT(kSmiTag == 0);
+  static_assert(kSmiTag == 0);
   DCHECK(SmiValuesAre32Bits() || SmiValuesAre31Bits());
   if (COMPRESS_POINTERS_BOOL) {
     shll(reg, Immediate(kSmiShift));
@@ -1270,7 +1270,7 @@ void TurboAssembler::SmiTag(Register dst, Register src) {
 }
 
 void TurboAssembler::SmiUntag(Register reg) {
-  STATIC_ASSERT(kSmiTag == 0);
+  static_assert(kSmiTag == 0);
   DCHECK(SmiValuesAre32Bits() || SmiValuesAre31Bits());
   // TODO(v8:7703): Is there a way to avoid this sign extension when pointer
   // compression is enabled?
@@ -1289,7 +1289,7 @@ void TurboAssembler::SmiUntag(Register dst, Register src) {
   }
   // TODO(v8:7703): Call SmiUntag(reg) if we can find a way to avoid the extra
   // mov when pointer compression is enabled.
-  STATIC_ASSERT(kSmiTag == 0);
+  static_assert(kSmiTag == 0);
   DCHECK(SmiValuesAre32Bits() || SmiValuesAre31Bits());
   sarq(dst, Immediate(kSmiShift));
 }
@@ -1311,7 +1311,7 @@ void TurboAssembler::SmiUntag(Register dst, Operand src) {
 }
 
 void TurboAssembler::SmiToInt32(Register reg) {
-  STATIC_ASSERT(kSmiTag == 0);
+  static_assert(kSmiTag == 0);
   DCHECK(SmiValuesAre32Bits() || SmiValuesAre31Bits());
   if (COMPRESS_POINTERS_BOOL) {
     sarl(reg, Immediate(kSmiShift));
@@ -1371,13 +1371,13 @@ void TurboAssembler::Cmp(Operand dst, Smi src) {
 }
 
 Condition TurboAssembler::CheckSmi(Register src) {
-  STATIC_ASSERT(kSmiTag == 0);
+  static_assert(kSmiTag == 0);
   testb(src, Immediate(kSmiTagMask));
   return zero;
 }
 
 Condition TurboAssembler::CheckSmi(Operand src) {
-  STATIC_ASSERT(kSmiTag == 0);
+  static_assert(kSmiTag == 0);
   testb(src, Immediate(kSmiTagMask));
   return zero;
 }
@@ -1473,7 +1473,7 @@ void TurboAssembler::Push(Smi source) {
 // ----------------------------------------------------------------------------
 
 void TurboAssembler::Move(Register dst, Smi source) {
-  STATIC_ASSERT(kSmiTag == 0);
+  static_assert(kSmiTag == 0);
   int value = source.value();
   if (value == 0) {
     xorl(dst, dst);
@@ -1817,6 +1817,20 @@ void TurboAssembler::Jump(Address destination, RelocInfo::Mode rmode) {
   jmp(kScratchRegister);
 }
 
+void TurboAssembler::Jump(Handle<CodeT> code_object, RelocInfo::Mode rmode) {
+  DCHECK_IMPLIES(
+      options().isolate_independent_code,
+      Builtins::IsIsolateIndependentBuiltin(FromCodeT(*code_object)));
+  if (options().inline_offheap_trampolines) {
+    Builtin builtin = Builtin::kNoBuiltinId;
+    if (isolate()->builtins()->IsBuiltinHandle(code_object, &builtin)) {
+      TailCallBuiltin(builtin);
+      return;
+    }
+  }
+  jmp(code_object, rmode);
+}
+
 void TurboAssembler::Jump(Handle<CodeT> code_object, RelocInfo::Mode rmode,
                           Condition cc) {
   DCHECK_IMPLIES(
@@ -1826,10 +1840,7 @@ void TurboAssembler::Jump(Handle<CodeT> code_object, RelocInfo::Mode rmode,
     Builtin builtin = Builtin::kNoBuiltinId;
     if (isolate()->builtins()->IsBuiltinHandle(code_object, &builtin)) {
       Label skip;
-      if (cc != always) {
-        if (cc == never) return;
-        j(NegateCondition(cc), &skip, Label::kNear);
-      }
+      j(NegateCondition(cc), &skip, Label::kNear);
       TailCallBuiltin(builtin);
       bind(&skip);
       return;
@@ -2011,7 +2022,7 @@ void TurboAssembler::LoadCodeDataContainerCodeNonBuiltin(
   ASM_CODE_COMMENT(this);
   CHECK(V8_EXTERNAL_CODE_SPACE_BOOL);
   // Given the fields layout we can read the Code reference as a full word.
-  STATIC_ASSERT(!V8_EXTERNAL_CODE_SPACE_BOOL ||
+  static_assert(!V8_EXTERNAL_CODE_SPACE_BOOL ||
                 (CodeDataContainer::kCodeCageBaseUpper32BitsOffset ==
                  CodeDataContainer::kCodeOffset + kTaggedSize));
   movq(destination, FieldOperand(code_data_container_object,
@@ -2261,8 +2272,8 @@ void TurboAssembler::Popcntq(Register dst, Operand src) {
 
 void MacroAssembler::PushStackHandler() {
   // Adjust this code if not the case.
-  STATIC_ASSERT(StackHandlerConstants::kSize == 2 * kSystemPointerSize);
-  STATIC_ASSERT(StackHandlerConstants::kNextOffset == 0);
+  static_assert(StackHandlerConstants::kSize == 2 * kSystemPointerSize);
+  static_assert(StackHandlerConstants::kNextOffset == 0);
 
   Push(Immediate(0));  // Padding.
 
@@ -2276,7 +2287,7 @@ void MacroAssembler::PushStackHandler() {
 }
 
 void MacroAssembler::PopStackHandler() {
-  STATIC_ASSERT(StackHandlerConstants::kNextOffset == 0);
+  static_assert(StackHandlerConstants::kNextOffset == 0);
   ExternalReference handler_address =
       ExternalReference::Create(IsolateAddressId::kHandlerAddress, isolate());
   Pop(ExternalReferenceAsOperand(handler_address));
@@ -2330,6 +2341,24 @@ void MacroAssembler::CmpInstanceTypeRange(Register map,
   DCHECK_LT(lower_limit, higher_limit);
   movzxwl(instance_type_out, FieldOperand(map, Map::kInstanceTypeOffset));
   CompareRange(instance_type_out, lower_limit, higher_limit);
+}
+
+void MacroAssembler::TestCodeTIsMarkedForDeoptimization(Register codet,
+                                                        Register scratch) {
+  if (V8_EXTERNAL_CODE_SPACE_BOOL) {
+    testl(FieldOperand(codet, CodeDataContainer::kKindSpecificFlagsOffset),
+          Immediate(1 << Code::kMarkedForDeoptimizationBit));
+  } else {
+    LoadTaggedPointerField(scratch,
+                           FieldOperand(codet, Code::kCodeDataContainerOffset));
+    testl(FieldOperand(scratch, CodeDataContainer::kKindSpecificFlagsOffset),
+          Immediate(1 << Code::kMarkedForDeoptimizationBit));
+  }
+}
+
+Immediate MacroAssembler::ClearedValue() const {
+  return Immediate(
+      static_cast<int32_t>(HeapObjectReference::ClearedValue(isolate()).ptr()));
 }
 
 void TurboAssembler::AssertNotSmi(Register object) {

@@ -217,8 +217,8 @@ class StreamTester {
 
   void FinishStream() { stream_->Finish(); }
 
-  void SetCompiledModuleBytes(const uint8_t* start, size_t length) {
-    stream_->SetCompiledModuleBytes(base::Vector<const uint8_t>(start, length));
+  void SetCompiledModuleBytes(base::Vector<const uint8_t> bytes) {
+    stream_->SetCompiledModuleBytes(bytes);
   }
 
   Zone* zone() { return &zone_; }
@@ -1167,7 +1167,7 @@ STREAM_TEST(TestIncrementalCaching) {
   CHECK(tester.native_module()->GetCode(2)->is_liftoff());
   // No TurboFan compilation happened yet, and therefore no call to the cache.
   CHECK_EQ(0, call_cache_counter);
-  i::wasm::TriggerTierUp(i_isolate, tester.native_module().get(), 0, instance);
+  i::wasm::TriggerTierUp(*instance, 0);
   tester.RunCompilerTasks();
   CHECK(!tester.native_module()->GetCode(0)->is_liftoff());
   CHECK(tester.native_module()->GetCode(1)->is_liftoff());
@@ -1178,7 +1178,7 @@ STREAM_TEST(TestIncrementalCaching) {
     i::wasm::WasmSerializer serializer(tester.native_module().get());
     serialized_size = serializer.GetSerializedNativeModuleSize();
   }
-  i::wasm::TriggerTierUp(i_isolate, tester.native_module().get(), 1, instance);
+  i::wasm::TriggerTierUp(*instance, 1);
   tester.RunCompilerTasks();
   CHECK(!tester.native_module()->GetCode(0)->is_liftoff());
   CHECK(!tester.native_module()->GetCode(1)->is_liftoff());
@@ -1231,7 +1231,7 @@ STREAM_TEST(TestDeserializationBypassesCompilation) {
   ZoneBuffer wire_bytes = GetValidModuleBytes(tester.zone());
   ZoneBuffer module_bytes =
       GetValidCompiledModuleBytes(isolate, tester.zone(), wire_bytes);
-  tester.SetCompiledModuleBytes(module_bytes.begin(), module_bytes.size());
+  tester.SetCompiledModuleBytes(base::VectorOf(module_bytes));
   tester.OnBytesReceived(wire_bytes.begin(), wire_bytes.size());
   tester.FinishStream();
 
@@ -1250,7 +1250,7 @@ STREAM_TEST(TestDeserializationFails) {
   // corrupt header
   byte first_byte = *module_bytes.begin();
   module_bytes.patch_u8(0, first_byte + 1);
-  tester.SetCompiledModuleBytes(module_bytes.begin(), module_bytes.size());
+  tester.SetCompiledModuleBytes(base::VectorOf(module_bytes));
   tester.OnBytesReceived(wire_bytes.begin(), wire_bytes.size());
   tester.FinishStream();
 

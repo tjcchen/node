@@ -119,7 +119,7 @@ void CcTest::Run(const char* snapshot_directory) {
     platform = std::move(underlying_default_platform);
   }
   v8::V8::InitializePlatform(platform.get());
-#ifdef V8_SANDBOX
+#ifdef V8_ENABLE_SANDBOX
   CHECK(v8::V8::InitializeSandbox());
 #endif
   cppgc::InitializeProcess(platform->GetPageAllocator());
@@ -336,9 +336,12 @@ i::Handle<i::JSFunction> Optimize(
 }
 
 static void PrintTestList() {
+  int test_num = 0;
   for (const auto& entry : g_cctests.Get()) {
-    printf("%s\n", entry.first.c_str());
+    printf("**>Test: %s\n", entry.first.c_str());
+    test_num++;
   }
+  printf("\nTotal number of tests: %d\n", test_num);
 }
 
 int main(int argc, char* argv[]) {

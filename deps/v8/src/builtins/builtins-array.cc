@@ -1464,8 +1464,8 @@ MaybeHandle<JSArray> Fast_ArrayConcat(Isolate* isolate,
   }
   // We shouldn't overflow when adding another len.
   const int kHalfOfMaxInt = 1 << (kBitsPerInt - 2);
-  STATIC_ASSERT(FixedArray::kMaxLength < kHalfOfMaxInt);
-  STATIC_ASSERT(FixedDoubleArray::kMaxLength < kHalfOfMaxInt);
+  static_assert(FixedArray::kMaxLength < kHalfOfMaxInt);
+  static_assert(FixedDoubleArray::kMaxLength < kHalfOfMaxInt);
   USE(kHalfOfMaxInt);
 
   int n_arguments = args->length();
@@ -1515,7 +1515,8 @@ BUILTIN(ArrayConcat) {
   ASSIGN_RETURN_FAILURE_ON_EXCEPTION(
       isolate, receiver,
       Object::ToObject(isolate, args.receiver(), "Array.prototype.concat"));
-  args.set_at(0, *receiver);
+  BuiltinArguments::ChangeValueScope set_receiver_value_scope(
+      isolate, &args, BuiltinArguments::kReceiverOffset, *receiver);
 
   Handle<JSArray> result_array;
 

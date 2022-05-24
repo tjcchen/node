@@ -28,6 +28,7 @@ class TurbofanCompilationJob;
 
 namespace wasm {
 
+class AssemblerBufferCache;
 class NativeModule;
 class WasmCode;
 class WasmEngine;
@@ -69,6 +70,7 @@ class V8_EXPORT_PRIVATE WasmCompilationUnit final {
 
   WasmCompilationResult ExecuteCompilation(CompilationEnv*,
                                            const WireBytesStorage*, Counters*,
+                                           AssemblerBufferCache*,
                                            WasmFeatures* detected);
 
   ExecutionTier tier() const { return tier_; }
@@ -83,6 +85,7 @@ class V8_EXPORT_PRIVATE WasmCompilationUnit final {
   WasmCompilationResult ExecuteFunctionCompilation(CompilationEnv*,
                                                    const WireBytesStorage*,
                                                    Counters*,
+                                                   AssemblerBufferCache*,
                                                    WasmFeatures* detected);
 
   WasmCompilationResult ExecuteImportWrapperCompilation(CompilationEnv*);
@@ -95,7 +98,7 @@ class V8_EXPORT_PRIVATE WasmCompilationUnit final {
 // {WasmCompilationUnit} should be trivially copyable and small enough so we can
 // efficiently pass it by value.
 ASSERT_TRIVIALLY_COPYABLE(WasmCompilationUnit);
-STATIC_ASSERT(sizeof(WasmCompilationUnit) <= 2 * kSystemPointerSize);
+static_assert(sizeof(WasmCompilationUnit) <= 2 * kSystemPointerSize);
 
 class V8_EXPORT_PRIVATE JSToWasmWrapperCompilationUnit final {
  public:

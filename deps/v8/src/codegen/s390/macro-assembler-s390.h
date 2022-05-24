@@ -808,7 +808,7 @@ class V8_EXPORT_PRIVATE TurboAssembler : public TurboAssemblerBase {
   template <class T>
   void LoadF64(DoubleRegister result, T value, Register scratch) {
     static_assert(sizeof(T) == kDoubleSize, "Expect input size to be 8");
-    uint64_t int_val = bit_cast<uint64_t, T>(value);
+    uint64_t int_val = base::bit_cast<uint64_t, T>(value);
     // Load the 64-bit value into a GPR, then transfer it to FPR via LDGR
     uint32_t hi_32 = int_val >> 32;
     uint32_t lo_32 = static_cast<uint32_t>(int_val);
@@ -828,7 +828,7 @@ class V8_EXPORT_PRIVATE TurboAssembler : public TurboAssemblerBase {
   template <class T>
   void LoadF32(DoubleRegister result, T value, Register scratch) {
     static_assert(sizeof(T) == kFloatSize, "Expect input size to be 4");
-    uint32_t int_val = bit_cast<uint32_t, T>(value);
+    uint32_t int_val = base::bit_cast<uint32_t, T>(value);
     LoadF64(result, static_cast<uint64_t>(int_val) << 32, scratch);
   }
 
@@ -1434,10 +1434,10 @@ class V8_EXPORT_PRIVATE TurboAssembler : public TurboAssemblerBase {
 
   void SmiToPtrArrayOffset(Register dst, Register src) {
 #if defined(V8_COMPRESS_POINTERS) || defined(V8_31BIT_SMIS_ON_64BIT_ARCH)
-    STATIC_ASSERT(kSmiTag == 0 && kSmiShift < kSystemPointerSizeLog2);
+    static_assert(kSmiTag == 0 && kSmiShift < kSystemPointerSizeLog2);
     ShiftLeftU64(dst, src, Operand(kSystemPointerSizeLog2 - kSmiShift));
 #else
-    STATIC_ASSERT(kSmiTag == 0 && kSmiShift > kSystemPointerSizeLog2);
+    static_assert(kSmiTag == 0 && kSmiShift > kSystemPointerSizeLog2);
     ShiftRightS64(dst, src, Operand(kSmiShift - kSystemPointerSizeLog2));
 #endif
   }
@@ -1702,8 +1702,8 @@ class V8_EXPORT_PRIVATE MacroAssembler : public TurboAssembler {
 #if !defined(V8_COMPRESS_POINTERS) && !defined(V8_31BIT_SMIS_ON_64BIT_ARCH)
   // Ensure it is permissible to read/write int value directly from
   // upper half of the smi.
-  STATIC_ASSERT(kSmiTag == 0);
-  STATIC_ASSERT(kSmiTagSize + kSmiShiftSize == 32);
+  static_assert(kSmiTag == 0);
+  static_assert(kSmiTagSize + kSmiShiftSize == 32);
 #endif
 #if V8_TARGET_LITTLE_ENDIAN
 #define SmiWordOffset(offset) (offset + kSystemPointerSize / 2)
@@ -1772,6 +1772,9 @@ class V8_EXPORT_PRIVATE MacroAssembler : public TurboAssembler {
       LinkRegisterStatus lr_status, SaveFPRegsMode save_fp,
       RememberedSetAction remembered_set_action = RememberedSetAction::kEmit,
       SmiCheck smi_check = SmiCheck::kInline);
+
+  void TestCodeTIsMarkedForDeoptimization(Register codet, Register scratch);
+  Operand ClearedValue() const;
 
  private:
   static const int kSmiShift = kSmiTagSize + kSmiShiftSize;

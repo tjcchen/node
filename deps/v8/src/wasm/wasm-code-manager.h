@@ -75,6 +75,8 @@ struct WasmModule;
   V(WasmTableGrow)                        \
   V(WasmTableGet)                         \
   V(WasmTableSet)                         \
+  V(WasmTableGetFuncRef)                  \
+  V(WasmTableSetFuncRef)                  \
   V(WasmStackGuard)                       \
   V(WasmStackOverflow)                    \
   V(WasmAllocateFixedArray)               \
@@ -140,12 +142,12 @@ class V8_EXPORT_PRIVATE DisjointAllocationPool final {
   // obtained from a previous Allocate. Returns the merged region.
   base::AddressRegion Merge(base::AddressRegion);
 
-  // Allocate a contiguous region of size {size}. Return an empty pool on
+  // Allocate a contiguous region of size {size}. Return an empty region on
   // failure.
   base::AddressRegion Allocate(size_t size);
 
   // Allocate a contiguous region of size {size} within {region}. Return an
-  // empty pool on failure.
+  // empty region on failure.
   base::AddressRegion AllocateInRegion(size_t size, base::AddressRegion);
 
   bool IsEmpty() const { return regions_.empty(); }
@@ -496,7 +498,7 @@ class V8_EXPORT_PRIVATE WasmCode final {
 // Increase the limit if needed, but first check if the size increase is
 // justified.
 #ifndef V8_GC_MOLE
-STATIC_ASSERT(sizeof(WasmCode) <= 88);
+static_assert(sizeof(WasmCode) <= 88);
 #endif
 
 WasmCode::Kind GetCodeKind(const WasmCompilationResult& result);
@@ -1068,6 +1070,12 @@ class V8_EXPORT_PRIVATE WasmCodeManager final {
   // Initialize the current thread's permissions for the memory protection key,
   // if we have support.
   void InitializeMemoryProtectionKeyPermissionsIfSupported() const;
+
+  // Allocate new memory for assembler buffers, potentially protected by PKU.
+  base::AddressRegion AllocateAssemblerBufferSpace(int size);
+
+  // Free previously allocated space for assembler buffers.
+  void FreeAssemblerBufferSpace(base::AddressRegion region);
 
  private:
   friend class WasmCodeAllocator;
